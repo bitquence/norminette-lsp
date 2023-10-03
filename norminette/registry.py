@@ -48,7 +48,7 @@ class Registry:
             context.tkn_scope = 0
         return ret, read
 
-    def run(self, context, source):
+    def run(self, context, source, silent=False):
         """
         Main function for each file.
         Primary rules are determined by the prefix "Is" and
@@ -82,19 +82,20 @@ class Registry:
                 unrecognized_tkns.append(context.tokens[0])
                 context.pop_tokens(1)  # ##################################
             # #############################################################
-        if unrecognized_tkns != []:
-            print(context.debug)
-            if context.debug > 0:
-                print("uncaught ->", unrecognized_tkns)
-        if context.errors == []:
-            print(context.filename + ": OK!")
-        else:
-            print(context.filename + ": Error!")
-            context.errors = sorted(
-                context.errors + context.warnings, key=cmp_to_key(sort_errs)
-            )
-            for err in context.errors:
-                print(err)
-            # context.warnings = sorted(context.warnings, key=cmp_to_key(sort_errs))
-            # for warn in context.warnings:
-            #     print (warn)
+        if not silent:
+            if unrecognized_tkns != []:
+                print(context.debug)
+                if context.debug > 0:
+                    print("uncaught ->", unrecognized_tkns)
+            if context.errors == []:
+                print(context.filename + ": OK!")
+            else:
+                print(context.filename + ": Error!")
+                context.errors = sorted(
+                    context.errors + context.warnings, key=cmp_to_key(sort_errs)
+                )
+                for err in context.errors:
+                    print(err)
+                # context.warnings = sorted(context.warnings, key=cmp_to_key(sort_errs))
+                # for warn in context.warnings:
+                #     print (warn)

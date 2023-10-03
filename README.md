@@ -1,5 +1,11 @@
 # norminette for 42 schools
 
+> (bitquence) LSP note: you are free to use this, but do keep in mind that it
+> was quickly hacked together by a soon-to-be student for his own purposes, and
+> that issues and small kinks may pop up.
+> I don't intend on opening a PR on the main repo as this feature is quite
+> niche and may interest only a few students.
+
 ## Install
 
 Requires python3.8+ (3.8, 3.9, 3.10, 3.11)
@@ -41,6 +47,24 @@ norminette -d
 
 ```
 norminette -dd
+```
+
+## LSP Server Usage
+
+Use the following code snippets to receive real-time warnings and norm errors
+from `norminette` from within your text editor.
+
+Keep in mind that the LSP server will only report diagnostics for files
+containing a valid 42 header.
+
+### Neovim (built-in LSP client)
+
+```
+vim.lsp.start({
+    name = 'norminette',
+    cmd = { 'norminette', '--lsp-server' },
+    filetypes = { "c", "h" },
+})
 ```
 
 ## Docker usage

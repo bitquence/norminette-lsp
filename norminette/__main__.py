@@ -3,9 +3,21 @@ import os
 import sys
 from importlib.metadata import version
 
+from pygls.server import LanguageServer
+from lsprotocol.types import (
+    TEXT_DOCUMENT_DID_OPEN,
+    TEXT_DOCUMENT_DID_CHANGE,
+    DidOpenTextDocumentParams,
+    DidChangeTextDocumentParams,
+    Diagnostic,
+    DiagnosticSeverity,
+    Range,
+    Position,
+)
 import argparse
 from norminette.lexer import Lexer, TokenError
 from norminette.exceptions import CParsingError
+from norminette.norm_error import NormError
 from norminette.registry import Registry
 from norminette.context import Context
 from norminette.tools.colors import colors
@@ -26,6 +38,52 @@ def timeout(e, timeval=5):
     if e.is_set():
         return
     _thread.interrupt_main()
+
+
+def start_lsp_server(registry, args):
+    server = LanguageServer("norminette", version("norminette"))
+
+    @server.feature(TEXT_DOCUMENT_DID_OPEN)
+    async def did_open(ls, params: DidOpenTextDocumentParams):
+        return await did_change(ls, params)
+
+    @server.feature(TEXT_DOCUMENT_DID_CHANGE)
+    async def did_change(ls, params: DidChangeTextDocumentParams):
+        text_doc = ls.workspace.get_document(params.text_document.uri)
+
+        lexer = Lexer(text_doc.source)
+        tokens = lexer.get_tokens()
+        context = Context(params.text_document.uri, tokens, args.debug, args.R)
+        registry.run(context, text_doc.source, silent=True)
+
+        diagnostics = []
+
+        for error in context.errors + context.warnings:
+            # do nothing should the file not contain a valid 42 header
+            if error.errno == 'INVALID_HEADER':
+                return
+
+            if isinstance(error, NormError):
+                severity = DiagnosticSeverity.Error
+            else:
+                severity = DiagnosticSeverity.Warning
+
+            diagnostics.append(
+                Diagnostic(
+                   range=Range(
+                       start=Position(error.line - 1, error.col - 1),
+                       end=Position(error.line - 1, error.col - 1 + error.length)
+                   ),
+                   message=error.error_msg,
+                   severity=severity,
+                   source=f"norminette ({error.errno})"
+                ),
+            )
+
+        if len(diagnostics) > 0:
+            ls.publish_diagnostics(text_doc.uri, diagnostics)
+
+    server.start_io()
 
 
 def main():
@@ -77,12 +135,20 @@ def main():
         action="store_true",
         help="Parse only source files not match to .gitignore",
     )
+    parser.add_argument(
+        "--lsp-server",
+        action="store_true",
+        help="Launches an LSP-compliant language server by I/O for real-time use in text editors",
+    )
     parser.add_argument("-R", nargs=1, help="compatibility for norminette 2")
     args = parser.parse_args()
     registry = Registry()
     targets = []
     has_err = None
     content = None
+
+    if args.lsp_server:
+        return start_lsp_server(registry, args)
 
     debug = args.debug
     if args.cfile is not None or args.hfile is not None:
